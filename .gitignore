@@ -11,3 +11,6 @@ config.yaml
 
 # Notas internas de quem mantém o projeto (citam infraestrutura privada)
 CLAUDE.md
+
+# Personalizações locais (ex.: um prompt próprio em prompt.local.md)
+*.local.md
