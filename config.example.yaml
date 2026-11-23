@@ -13,6 +13,12 @@ assistant_prompt:
   template_path: "templates/assistant_prompt.md"
   briefing_doc_name: "Daily Briefing - Atual"
 
+# Histórico entre execuções: alimenta a seção "Desde a Última Execução" (compara com o último dia anterior).
+history:
+  enabled: true
+  path: "history"   # relativo à pasta do projeto; fica fora do Git
+  keep_days: 45
+
 collectors:
   businessmap:
     enabled: false

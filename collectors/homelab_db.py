@@ -11,7 +11,7 @@ import re
 import subprocess
 from urllib.parse import parse_qs, urlparse
 
-from collectors import register
+from collectors import Section, metric, register
 
 _SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 _FIELD_SEP = "\x1f"
@@ -63,8 +63,9 @@ def collect_kanbn(cfg: dict, app_cfg: dict) -> str:
         return "- *`KANBN_DATABASE_URL` não configurada.*"
 
     try:
+        # Todas as tarefas abertas: as 8 mais recentes vão para o texto; o conjunto inteiro vai para o histórico.
         sql = """
-            SELECT '- **[' || b.name || ' • ' || l.name || ']** ' || c.title
+            SELECT b.name, l.name, c.title
             FROM card c
             JOIN list l ON c."listId" = l.id
             JOIN board b ON l."boardId" = b.id
@@ -73,11 +74,15 @@ def collect_kanbn(cfg: dict, app_cfg: dict) -> str:
               AND b."isArchived" = false
               AND l."deletedAt" IS NULL
               AND LOWER(l.name) NOT IN ('done', 'concluído', 'fechado', 'aprovada e arquivada', 'entregue', 'perdido')
-            ORDER BY c.id DESC
-            LIMIT 8;
+            ORDER BY c.id DESC;
         """
         rows = _query(db_url, sql)
-        return "\n".join(r[0] for r in rows) if rows else "- *Nenhuma tarefa aberta no momento.*"
+        text = (
+            "\n".join(f"- **[{board} • {lst}]** {title}" for board, lst, title in rows[:8])
+            if rows
+            else "- *Nenhuma tarefa aberta no momento.*"
+        )
+        return Section(text, {"Tarefas abertas": metric([f"{board} • {title}" for board, _, title in rows], "set")})
     except Exception as exc:
         return f"⚠️ Erro ao ler Kanbn: {exc}"
 
@@ -131,13 +136,17 @@ def collect_securo(cfg: dict, app_cfg: dict) -> str:
         )
         tx_lines = [f"- `[{dt}]` **{desc}**: {_format_brl(_num(amt))}" for dt, amt, desc in tx_rows]
 
-        return (
+        return Section(
             f"### 💵 Saldo Líquido Disponível: {_format_brl(total_liq)}\n"
             f"{chr(10).join(chk_lines)}\n\n"
             f"### 💳 Cartões de Crédito\n"
             f"{chr(10).join(cc_lines) if cc_lines else '- *Nenhum cartão ativo.*'}\n\n"
             f"### 🧾 Últimas Transações\n"
-            f"{chr(10).join(tx_lines) if tx_lines else '- *Sem transações recentes.*'}"
+            f"{chr(10).join(tx_lines) if tx_lines else '- *Sem transações recentes.*'}",
+            {
+                "Saldo líquido": metric(total_liq, "brl"),
+                "Limite comprometido nos cartões": metric(sum(_num(r[3]) for r in cc_rows), "brl"),
+            },
         )
     except Exception as exc:
         return f"⚠️ Erro ao ler Securo: {exc}"
@@ -166,12 +175,13 @@ def collect_umami(cfg: dict, app_cfg: dict) -> str:
             ORDER BY visitors DESC, views DESC;
         """
         rows = [(name, int(vis), int(vw)) for name, vis, vw in _query(db_url, sql)]
-        if not rows:
-            return "- *Nenhum acesso registrado nas últimas 24 horas.*"
         total_vis = sum(vis for _, vis, _ in rows)
         total_vw = sum(vw for _, _, vw in rows)
+        metrics = {"Visitantes (24h)": metric(total_vis), "Visualizações (24h)": metric(total_vw)}
+        if not rows:
+            return Section("- *Nenhum acesso registrado nas últimas 24 horas.*", metrics)
         lines = [f"* **Visão Geral das Últimas 24h:** {total_vis} visitantes únicos | {total_vw} visualizações"]
         lines += [f"- **{name}:** {vis} visitante(s) único(s) ({vw} visualizações)" for name, vis, vw in rows]
-        return "\n".join(lines)
+        return Section("\n".join(lines), metrics)
     except Exception as exc:
         return f"⚠️ Erro ao ler Umami: {exc}"

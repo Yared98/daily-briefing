@@ -2,7 +2,7 @@ import os
 import shutil
 import subprocess
 
-from collectors import register
+from collectors import Section, metric, register
 
 
 def _read_linux_memory() -> tuple[float, float, float]:
@@ -48,10 +48,12 @@ def collect(cfg: dict, app_cfg: dict) -> str:
         d_status = "🚨 CRÍTICO (>85%)" if d_pct > 85 else "✅ Saudável"
 
         res_lines = [f"* **Armazenamento:** {d_free:.1f} GB livres de {d_tot:.1f} GB ({d_pct:.1f}% em uso) — {d_status}"]
+        metrics = {"Disco em uso": metric(d_pct, "pct")}
 
         memory = _read_memory()
         if memory:
             m_tot, m_avail, m_pct = memory
+            metrics["RAM em uso"] = metric(m_pct, "pct")
             m_status = "⚠️ Alerta (>85%)" if m_pct > 85 else "✅ Saudável"
             res_lines.append(
                 f"* **Memória RAM:** {m_avail:.1f} GB livres de {m_tot:.1f} GB ({m_pct:.1f}% em uso) — {m_status}"
@@ -80,6 +82,12 @@ def collect(cfg: dict, app_cfg: dict) -> str:
                     c_alerts.append(f"  * ℹ️ Parados: {', '.join(stopped)}")
                 if not c_alerts:
                     c_alerts.append("  * ✅ Todos os containers rodando normalmente.")
+                metrics["Containers com problema"] = metric(
+                    [f"{n} (reiniciando)" for n in restarting]
+                    + [f"{n} (unhealthy)" for n in unhealthy]
+                    + [f"{n} (parado)" for n in stopped],
+                    "set",
+                )
 
                 sections.append(
                     f"* **Containers Docker:** {tot_c} totais ({tot_c - len(restarting) - len(stopped)} ativos)\n"
@@ -110,6 +118,6 @@ def collect(cfg: dict, app_cfg: dict) -> str:
                 sections.append(f"* **Containers Docker:** ⚠️ não foi possível consultar o Docker ({exc.__class__.__name__}).")
 
         sections.insert(1 if sections else 0, "#### 🖥️ Consumo de Recursos:\n" + "\n".join(res_lines))
-        return "\n\n".join(sections)
+        return Section("\n\n".join(sections), metrics)
     except Exception as exc:
         return f"⚠️ Erro ao verificar infraestrutura: {exc}"

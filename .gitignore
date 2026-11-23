@@ -14,3 +14,6 @@ CLAUDE.md
 
 # Personalizações locais (ex.: um prompt próprio em prompt.local.md)
 *.local.md
+
+# Histórico local entre execuções (contém dados pessoais)
+history/

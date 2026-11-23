@@ -10,9 +10,11 @@ BASE_FOCUS_ITEMS = [
     "🎯 **Top 3 Prioridades do Dia**",
     "📅 **Linha do Tempo de Hoje** (sinalizando conflitos ou falta de intervalo)",
 ]
+HISTORY_TITLE = "## 🔁 Desde a Última Execução"
+HISTORY_FOCUS = "🔁 **Desde ontem** (o que avançou, o que piorou e o que está parado há dias)"
 
 
-def build_prompt(results: list, profile: dict, prompt_cfg: dict, publisher_mode: str) -> str:
+def build_prompt(results: list, profile: dict, prompt_cfg: dict, publisher_mode: str, has_history: bool = False) -> str:
     """Renderiza o template do prompt do assistente (variáveis no formato $nome)."""
     path = prompt_cfg.get("template_path") or DEFAULT_PROMPT_TEMPLATE
     if not os.path.isabs(path):
@@ -30,6 +32,8 @@ def build_prompt(results: list, profile: dict, prompt_cfg: dict, publisher_mode:
     )
 
     focus = list(BASE_FOCUS_ITEMS)
+    if has_history:
+        focus.append(HISTORY_FOCUS)
     for collector, _ in results:
         if collector.focus and collector.focus not in focus:
             focus.append(collector.focus)
@@ -43,10 +47,17 @@ def build_prompt(results: list, profile: dict, prompt_cfg: dict, publisher_mode:
     ).rstrip()
 
 
-def build_briefing(results: list, profile: dict, prompt_cfg: dict | None = None, publisher_mode: str = "local") -> str:
+def build_briefing(
+    results: list,
+    profile: dict,
+    prompt_cfg: dict | None = None,
+    publisher_mode: str = "local",
+    history_md: str | None = None,
+) -> str:
     """Monta o Markdown final.
 
-    `results` é uma lista de `(Collector, markdown)` já na ordem de exibição.
+    `results` é uma lista de `(Collector, markdown)` já na ordem de exibição; `history_md`, se houver,
+    entra logo depois do cabeçalho como "Desde a última execução".
     """
     prompt_cfg = prompt_cfg or {}
     now = datetime.datetime.now()
@@ -56,9 +67,11 @@ def build_briefing(results: list, profile: dict, prompt_cfg: dict | None = None,
         f"# 📊 Daily Briefing Executivo - {owner_name}\n"
         f"**Data:** {now:%d/%m/%Y} | **Horário de Geração:** {now:%H:%M}"
     ]
+    if history_md:
+        blocks.append(f"{HISTORY_TITLE}\n{history_md}")
     blocks += [f"{collector.title}\n{content}" for collector, content in results]
 
     if prompt_cfg.get("enabled", True):
-        blocks.append(build_prompt(results, profile, prompt_cfg, publisher_mode))
+        blocks.append(build_prompt(results, profile, prompt_cfg, publisher_mode, bool(history_md)))
 
     return "\n\n---\n\n".join(blocks) + "\n"

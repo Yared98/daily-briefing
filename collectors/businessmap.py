@@ -2,7 +2,7 @@ import collections
 import os
 import requests
 
-from collectors import register
+from collectors import Section, metric, register
 
 
 @register("businessmap", title="## 💼 Demandas Corporativas (Businessmap)", order=10)
@@ -46,6 +46,7 @@ def collect(cfg: dict, app_cfg: dict) -> str:
             page += 1
 
         my_tasks_lines = []
+        my_active = []
         if owner_id is not None:
             my_active = [c for c in all_cards if c.get("owner_user_id") == owner_id and c.get("section") in (2, 3)]
             my_backlog = [c for c in all_cards if c.get("owner_user_id") == owner_id and c.get("section") == 1]
@@ -81,7 +82,15 @@ def collect(cfg: dict, app_cfg: dict) -> str:
         funnel_lines = [f"- **{col}**: {cnt} card(s)" for col, cnt in col_counts.most_common(6)]
         team_load_lines = [f"- **{user}**: {cnt} card(s)" for user, cnt in owner_counts.most_common(7)]
 
-        return (
+        metrics = {
+            "WIP do time": metric(len(active_cards)),
+            "Cards bloqueados": metric(len(blocked_cards)),
+        }
+        if owner_id is not None:
+            metrics["Meus cards em andamento"] = metric(
+                [f"#{c.get('card_id')} {c.get('title')}" for c in my_active], "set"
+            )
+        return Section(
             f"### 🎯 Minhas Demandas em Foco\n"
             f"{chr(10).join(my_tasks_lines)}\n\n"
             f"### 🩺 Saúde do Time & Métricas ({board_name})\n"
@@ -90,7 +99,8 @@ def collect(cfg: dict, app_cfg: dict) -> str:
             f"#### 📊 Funil de Trabalho Ativo:\n"
             f"{chr(10).join(funnel_lines)}\n\n"
             f"#### 👥 Distribuição de Carga no Time:\n"
-            f"{chr(10).join(team_load_lines)}"
+            f"{chr(10).join(team_load_lines)}",
+            metrics,
         )
     except Exception as exc:
         return f"⚠️ Erro ao consultar Businessmap: {exc}"

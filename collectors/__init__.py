@@ -17,11 +17,38 @@ e ligue-o no `config.yaml`:
 
 `cfg` é o bloco do conector no `config.yaml`; `app_cfg` é o arquivo inteiro.
 Arquivos cujo nome começa com `_` são ignorados.
+
+Para entrar na seção "Desde a última execução", devolva `Section(markdown, metrics)`:
+
+    return Section(md, {"Itens abertos": metric(len(itens)), "Itens": metric(nomes, "set")})
+
+Tipos de métrica: "int", "brl" (reais), "pct" (percentual) e "set" (lista de itens; o histórico
+mostra os novos, os que saíram e há quantos dias cada um continua aparecendo).
 """
 import importlib
 import pkgutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Optional
+
+METRIC_KINDS = ("int", "brl", "pct", "set")
+
+
+@dataclass
+class Section:
+    markdown: str
+    metrics: dict = field(default_factory=dict)
+
+
+def metric(value, kind: str = "int") -> dict:
+    if kind not in METRIC_KINDS:
+        raise ValueError(f"tipo de métrica inválido: {kind}")
+    if kind == "set":
+        value = sorted({str(v) for v in value})
+    elif kind == "int":
+        value = int(value)
+    else:
+        value = round(float(value), 2)
+    return {"kind": kind, "value": value}
 
 
 @dataclass(frozen=True)
