@@ -2,8 +2,12 @@ import datetime
 import os
 import requests
 
+from collectors import register
 
-def collect(cfg: dict) -> str:
+
+@register("github_trending", title="## 🐙 Top Repositórios em Alta no GitHub", order=70,
+          focus="⚡ **Radar Express** (1 destaque de IA/notícias e 1 repositório)")
+def collect(cfg: dict, app_cfg: dict) -> str:
     """Busca os repositórios criados recentemente com maior número de estrelas no GitHub."""
     days_back = int(cfg.get("days_back", 7))
     per_page = int(cfg.get("per_page", 5))

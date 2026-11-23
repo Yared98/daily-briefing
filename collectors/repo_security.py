@@ -5,6 +5,8 @@ import re
 import subprocess
 import requests
 
+from collectors import register
+
 MAX_DEPS_PER_PROJECT = 50
 
 # nome[extras] <operador> versão — usa a primeira versão citada (pino exato ou limite inferior),
@@ -78,8 +80,11 @@ def _osv_queries(pkg_path: str) -> list:
     ]
 
 
-def collect(projects: list) -> str:
+@register("repo_security", title="## 🛡️ Radar de Segurança & Repositórios", order=30,
+          focus="🛡️ **Segurança & Repositórios** (alertas de vulnerabilidades)")
+def collect(cfg: dict, app_cfg: dict) -> str:
     """Monitora branch/commit recente e vulnerabilidades (Dependabot + OSV.dev) dos projetos."""
+    projects = app_cfg.get("supported_projects") or []
     if not projects:
         return "- *Nenhum repositório configurado em `supported_projects`.*"
 

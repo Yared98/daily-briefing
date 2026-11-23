@@ -2,8 +2,11 @@ import collections
 import os
 import requests
 
+from collectors import register
 
-def collect(cfg: dict) -> str:
+
+@register("businessmap", title="## 💼 Demandas Corporativas (Businessmap)", order=10)
+def collect(cfg: dict, app_cfg: dict) -> str:
     """Coleta demandas pessoais e métricas do time no Businessmap (Kanbanize API v2)."""
     base_url = os.getenv("BUSINESSMAP_URL", "").rstrip("/")
     api_key = os.getenv("BUSINESSMAP_API_KEY", "")

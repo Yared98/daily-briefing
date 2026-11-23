@@ -5,7 +5,7 @@ import sys
 import yaml
 from dotenv import load_dotenv
 
-from collectors import businessmap, github_trending, homelab_db, infra_health, news_ai, repo_security
+import collectors
 from formatters.briefing import build_briefing
 from publishers import google_docs, local_markdown
 
@@ -17,6 +17,30 @@ def load_config(path: str) -> dict:
         )
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
+
+
+def run_collectors(cfg: dict) -> list:
+    """Roda, na ordem do registro, os conectores habilitados em `collectors:` do config."""
+    for warning in collectors.discover():
+        print(f"[!] {warning}")
+
+    collectors_cfg = cfg.get("collectors") or {}
+    for key, c_cfg in collectors_cfg.items():
+        if (c_cfg or {}).get("enabled") and key not in collectors.REGISTRY:
+            print(f"[!] Conector '{key}' está habilitado no config, mas não existe em collectors/.")
+
+    results = []
+    for collector in collectors.ordered():
+        c_cfg = collectors_cfg.get(collector.key) or {}
+        if not c_cfg.get("enabled"):
+            continue
+        print(f"[*] Coletando {collector.key}...")
+        try:
+            content = collector.func(c_cfg, cfg)
+        except Exception as exc:  # um conector com erro não derruba o briefing
+            content = f"⚠️ Erro no conector `{collector.key}`: {exc.__class__.__name__}: {exc}"
+        results.append((collector, content))
+    return results
 
 
 def main() -> None:
@@ -37,45 +61,12 @@ def main() -> None:
 
     load_dotenv()
     cfg = load_config(args.config)
-    collectors_cfg = cfg.get("collectors", {})
-    sections = {}
-
-    if collectors_cfg.get("businessmap", {}).get("enabled"):
-        print("[*] Coletando Businessmap...")
-        sections["businessmap"] = businessmap.collect(collectors_cfg["businessmap"])
-
-    if collectors_cfg.get("kanbn", {}).get("enabled"):
-        print("[*] Coletando Kanbn...")
-        sections["kanbn"] = homelab_db.collect_kanbn()
-
-    if collectors_cfg.get("securo", {}).get("enabled"):
-        print("[*] Coletando Securo...")
-        sections["securo"] = homelab_db.collect_securo()
-
-    if collectors_cfg.get("umami", {}).get("enabled"):
-        print("[*] Coletando Umami...")
-        sections["umami"] = homelab_db.collect_umami()
-
-    if collectors_cfg.get("infra_health", {}).get("enabled"):
-        print("[*] Verificando infraestrutura...")
-        sections["infra_health"] = infra_health.collect(collectors_cfg["infra_health"])
-
-    if collectors_cfg.get("news_ai", {}).get("enabled"):
-        print("[*] Coletando notícias e radar de IA...")
-        sections["news_ai"] = news_ai.collect(collectors_cfg["news_ai"])
-
-    if collectors_cfg.get("github_trending", {}).get("enabled"):
-        print("[*] Coletando GitHub Trending...")
-        sections["github_trending"] = github_trending.collect(collectors_cfg["github_trending"])
-
-    if collectors_cfg.get("repo_security", {}).get("enabled"):
-        print("[*] Verificando segurança dos repositórios...")
-        sections["repo_security"] = repo_security.collect(cfg.get("supported_projects", []))
+    results = run_collectors(cfg)
 
     pub_cfg = cfg.get("publisher", {})
     mode = "local" if args.dry_run else (args.publisher or pub_cfg.get("mode", "local"))
 
-    doc_text = build_briefing(sections, cfg.get("profile", {}), cfg.get("assistant_prompt", {}), mode)
+    doc_text = build_briefing(results, cfg.get("profile", {}), cfg.get("assistant_prompt", {}), mode)
 
     if mode == "google_docs":
         print("[*] Publicando no Google Docs...")

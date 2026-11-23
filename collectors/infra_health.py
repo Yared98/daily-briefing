@@ -2,6 +2,8 @@ import os
 import shutil
 import subprocess
 
+from collectors import register
+
 
 def _read_linux_memory() -> tuple[float, float, float]:
     """Retorna (total_gb, avail_gb, pct_used) em Linux via /proc/meminfo."""
@@ -31,7 +33,9 @@ def _read_memory():
     return None
 
 
-def collect(cfg: dict) -> str:
+@register("infra_health", title="## 🖥️ Saúde da Infraestrutura", order=60,
+          focus="🖥️ **Infraestrutura** (alertas acima de 85%)")
+def collect(cfg: dict, app_cfg: dict) -> str:
     """Coleta saúde de disco, memória, CPU e containers Docker locais."""
     check_docker = cfg.get("check_docker", True)
     sections = []

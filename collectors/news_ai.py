@@ -1,6 +1,8 @@
 import os
 import requests
 
+from collectors import register
+
 
 def _format_reference_table(entries: list) -> str:
     """Formata a tabela de referência de modelos definida em `config.yaml`.
@@ -43,35 +45,32 @@ def _tavily_search(api_key: str, query: str, max_results: int) -> str:
     return "\n".join(items) if items else "- *Sem resultados retornados.*"
 
 
-def collect(cfg: dict) -> dict:
-    """Coleta manchetes gerais e radar de IA via Tavily API.
-
-    Retorna `news`, `ai` e, se configurada, `reference_table` + `reference_title`.
-    """
+@register("news_ai", title="## 🚀 Radar de Inteligência Artificial, Tecnologia & Notícias", order=80,
+          focus="⚡ **Radar Express** (1 destaque de IA/notícias e 1 repositório)")
+def collect(cfg: dict, app_cfg: dict) -> str:
+    """Coleta manchetes gerais e radar de IA via Tavily API (+ tabela de modelos opcional)."""
     api_key = os.getenv("TAVILY_API_KEY", "")
     max_results = int(cfg.get("max_results", 4))
     news_query = cfg.get("news_query", "principais notícias brasil e mundo economia tecnologia hoje")
     ai_query = cfg.get("ai_query", "ultimas noticias lancamentos inteligencia artificial LLM tecnologia")
 
-    ref_cfg = cfg.get("model_reference") or {}
-    result = {
-        "reference_table": _format_reference_table(ref_cfg.get("models", [])) if ref_cfg.get("enabled") else "",
-        "reference_title": ref_cfg.get("title", "Referência de Custo-Benefício de Modelos"),
-    }
-
     if not api_key:
-        msg = "- *`TAVILY_API_KEY` não configurada.*"
-        result.update(news=msg, ai=msg)
-        return result
+        news_md = ai_md = "- *`TAVILY_API_KEY` não configurada.*"
+    else:
+        try:
+            news_md = _tavily_search(api_key, news_query, max_results)
+        except Exception as exc:
+            news_md = f"⚠️ Erro ao buscar notícias: {exc}"
+        try:
+            ai_md = _tavily_search(api_key, ai_query, max_results)
+        except Exception as exc:
+            ai_md = f"⚠️ Erro ao buscar radar de IA: {exc}"
 
-    try:
-        result["news"] = _tavily_search(api_key, news_query, max_results)
-    except Exception as exc:
-        result["news"] = f"⚠️ Erro ao buscar notícias: {exc}"
-
-    try:
-        result["ai"] = _tavily_search(api_key, ai_query, max_results)
-    except Exception as exc:
-        result["ai"] = f"⚠️ Erro ao buscar radar de IA: {exc}"
-
-    return result
+    parts = [f"\n### 🤖 Radar de IA & Tecnologia\n{ai_md}"]
+    ref_cfg = cfg.get("model_reference") or {}
+    if ref_cfg.get("enabled"):
+        table = _format_reference_table(ref_cfg.get("models", []))
+        if table:
+            parts.append(f"### 💡 {ref_cfg.get('title', 'Referência de Custo-Benefício de Modelos')}\n{table}")
+    parts.append(f"### 🌍 Manchetes do Brasil e do Mundo\n{news_md}")
+    return "\n\n".join(parts)

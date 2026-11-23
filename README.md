@@ -5,7 +5,7 @@ Pipeline modular em Python que coleta métricas de trabalho, repositórios, segu
 ## Arquitetura
 
 ```text
-collectors/ (feature flags em config.yaml)
+collectors/ (descobertos automaticamente; ligados em config.yaml)
    ├── businessmap.py      -> Kanbanize / Businessmap API v2
    ├── github_trending.py  -> Repositórios em alta (GitHub API)
    ├── news_ai.py          -> Manchetes & IA (Tavily API)
@@ -59,6 +59,43 @@ Requer **Python 3.11+** (Linux, macOS ou Windows).
 - **Tabela de referência de modelos:** `collectors.news_ai.model_reference` é uma lista mantida à mão (nome, preço, observação). Vem desligada; não há busca automática de preços.
 - **Segurança de dependências:** em `supported_projects`, o campo `pkg` aceita `package.json` (npm), `requirements*.txt` ou `pyproject.toml` (PyPI, PEP 621 e Poetry). Sem `GITHUB_TOKEN` (ou sem acesso ao Dependabot do repositório), as versões são consultadas no [OSV.dev](https://osv.dev). Para faixas como `>=1.2` ou `^1.2`, é usada a versão mínima, o que pode apontar alertas já resolvidos na versão instalada. Se alguma consulta falhar (rede, permissão), o relatório mostra "Verificação incompleta" em vez de declarar os repositórios seguros.
 - **Infraestrutura:** disco e RAM funcionam em Linux, macOS e Windows; load average só em Linux/macOS; Docker quando o comando `docker` estiver disponível e o serviço estiver rodando.
+
+## Criar um conector
+
+Cada arquivo em `collectors/` é descoberto automaticamente. Para adicionar uma fonte nova, crie `collectors/meu_conector.py`:
+
+```python
+import os
+import requests
+
+from collectors import register
+
+
+@register(
+    "meu_conector",                    # chave usada no config.yaml
+    title="## 🧩 Meu Conector",         # título da seção no briefing
+    order=55,                          # posição (10 = topo, 80 = fim; veja os existentes)
+    focus="🧩 **Meu Conector** (o que o assistente deve destacar)",  # opcional, entra no prompt
+)
+def collect(cfg: dict, app_cfg: dict) -> str:
+    """`cfg` = bloco do conector no config.yaml; `app_cfg` = config inteiro. Devolve Markdown."""
+    token = os.getenv("MEU_CONECTOR_TOKEN", "")
+    if not token:
+        return "- *`MEU_CONECTOR_TOKEN` não configurado.*"
+    data = requests.get("https://api.exemplo.com/itens", headers={"Authorization": f"Bearer {token}"}, timeout=10).json()
+    return "\n".join(f"- {item['nome']}" for item in data[: cfg.get("limite", 5)])
+```
+
+E ligue no `config.yaml`:
+
+```yaml
+collectors:
+  meu_conector:
+    enabled: true
+    limite: 5
+```
+
+Boas práticas: segredos sempre no `.env` (nunca no código ou no YAML), `timeout` em toda chamada de rede, e devolver uma mensagem amigável em vez de levantar exceção. Se o conector levantar erro mesmo assim, o briefing segue e mostra o erro só naquela seção. Arquivos cujo nome começa com `_` são ignorados.
 
 ## Agendamento
 

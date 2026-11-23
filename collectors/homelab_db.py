@@ -1,11 +1,14 @@
 import os
 
+from collectors import register
+
 
 def _format_brl(value: float) -> str:
     return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def collect_kanbn() -> str:
+@register("kanbn", title="## 📌 Demandas Pessoais (Kanbn)", order=20)
+def collect_kanbn(cfg: dict, app_cfg: dict) -> str:
     """Coleta cards abertos no Kanbn via PostgreSQL."""
     db_url = os.getenv("KANBN_DATABASE_URL", "")
     if not db_url:
@@ -34,7 +37,9 @@ def collect_kanbn() -> str:
         return f"⚠️ Erro ao ler Kanbn: {exc}"
 
 
-def collect_securo() -> str:
+@register("securo", title="## 💰 Visão Financeira Pessoal (Securo)", order=40,
+          focus="💵 **Resumo Financeiro Rápido** (saldo e faturas próximas)")
+def collect_securo(cfg: dict, app_cfg: dict) -> str:
     """Coleta saldo líquido, cartões e transações recentes do Securo via PostgreSQL."""
     db_url = os.getenv("SECURO_DATABASE_URL", "")
     if not db_url:
@@ -96,7 +101,9 @@ def collect_securo() -> str:
         return f"⚠️ Erro ao ler Securo: {exc}"
 
 
-def collect_umami() -> str:
+@register("umami", title="## 📈 Tráfego Web (Umami Analytics - Últimas 24h)", order=50,
+          focus="📈 **Tráfego Web** (visitantes das últimas 24h)")
+def collect_umami(cfg: dict, app_cfg: dict) -> str:
     """Coleta visitantes únicos e visualizações das últimas 24h no Umami Analytics."""
     db_url = os.getenv("UMAMI_DATABASE_URL", "")
     if not db_url:
