@@ -1,0 +1,13 @@
+.env
+service_account.json
+*.bak
+*.log
+.venv/
+venv/
+__pycache__/
+*.pyc
+output/
+config.yaml
+
+# Notas internas de quem mantém o projeto (citam infraestrutura privada)
+CLAUDE.md

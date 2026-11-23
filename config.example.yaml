@@ -1,0 +1,55 @@
+profile:
+  owner_name: "Seu Nome"
+  corporate_email: "seu.nome@empresa.com"
+
+publisher:
+  mode: "local" # "google_docs" ou "local"
+  local_output_path: "output/daily_briefing.md"
+
+# Prompt anexado ao fim do briefing, para colar/ler num assistente (Gemini, Claude...).
+# O template aceita $owner_name, $briefing_ref, $doc_name, $agenda_hint e $focus_items.
+assistant_prompt:
+  enabled: true
+  template_path: "templates/assistant_prompt.md"
+  briefing_doc_name: "Daily Briefing - Atual"
+
+collectors:
+  businessmap:
+    enabled: false
+    board_name: "Meu Board"
+  kanbn:
+    enabled: false
+  securo:
+    enabled: false
+  umami:
+    enabled: false
+  infra_health:
+    enabled: true
+    check_docker: true
+  news_ai:
+    enabled: true
+    news_query: "principais notícias brasil e mundo economia tecnologia hoje"
+    ai_query: "ultimas noticias lancamentos inteligencia artificial LLM tecnologia"
+    max_results: 4
+    # Tabela opcional mantida à mão (não há busca automática de preços).
+    # Fonte sugerida: https://artificialanalysis.ai/models — atualize os valores com frequência.
+    model_reference:
+      enabled: false
+      title: "Referência de Custo-Benefício de Modelos"
+      models:
+        - name: "Modelo A"
+          price: "$X / 1M input | $Y / 1M output"
+          note: "por que vale a pena"
+  github_trending:
+    enabled: true
+    days_back: 7
+    per_page: 5
+  repo_security:
+    enabled: true
+
+supported_projects:
+  - name: "Exemplo Projeto"
+    slug: "usuario/repo"
+    path: ""
+    branch: "main"
+    pkg: ""
