@@ -110,3 +110,7 @@ Boas práticas: segredos sempre no `.env` (nunca no código ou no YAML), `timeou
 ```powershell
 schtasks /Create /SC DAILY /ST 08:00 /TN "Daily Briefing" /TR "cmd /c cd /d C:\caminho\daily-briefing && .venv\Scripts\python.exe main.py >> daily_briefing.log 2>&1"
 ```
+
+## Licença
+
+[MIT](LICENSE).
