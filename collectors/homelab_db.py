@@ -152,24 +152,26 @@ def collect_umami(cfg: dict, app_cfg: dict) -> str:
         return "- *`UMAMI_DATABASE_URL` não configurada.*"
 
     try:
+        # Só sites com acesso nas últimas 24h; visualizações = eventos de página (event_type 1).
         sql = """
             SELECT w.name,
-                   COUNT(DISTINCT s.session_id) AS visitors,
-                   COUNT(e.event_id) AS views
-            FROM website w
-            LEFT JOIN website_event e ON w.website_id = e.website_id
-              AND e.created_at >= NOW() - INTERVAL '24 hours'
+                   COUNT(DISTINCT e.session_id) AS visitors,
+                   COUNT(*) AS views
+            FROM website_event e
+            JOIN website w ON e.website_id = w.website_id
+            WHERE e.created_at >= NOW() - INTERVAL '24 hours'
               AND e.event_type = 1
-            LEFT JOIN session s ON e.session_id = s.session_id
-            WHERE w.deleted_at IS NULL
+              AND w.deleted_at IS NULL
             GROUP BY w.name
-            ORDER BY views DESC;
+            ORDER BY visitors DESC, views DESC;
         """
-        rows = _query(db_url, sql)
-        return (
-            "\n".join(f"- **{name}:** {vis} visitante(s) único(s) | {vw} visualização(ões)" for name, vis, vw in rows)
-            if rows
-            else "- *Nenhum site registrado no Umami.*"
-        )
+        rows = [(name, int(vis), int(vw)) for name, vis, vw in _query(db_url, sql)]
+        if not rows:
+            return "- *Nenhum acesso registrado nas últimas 24 horas.*"
+        total_vis = sum(vis for _, vis, _ in rows)
+        total_vw = sum(vw for _, _, vw in rows)
+        lines = [f"* **Visão Geral das Últimas 24h:** {total_vis} visitantes únicos | {total_vw} visualizações"]
+        lines += [f"- **{name}:** {vis} visitante(s) único(s) ({vw} visualizações)" for name, vis, vw in rows]
+        return "\n".join(lines)
     except Exception as exc:
         return f"⚠️ Erro ao ler Umami: {exc}"
