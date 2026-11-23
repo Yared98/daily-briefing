@@ -6,6 +6,11 @@ from unittest.mock import patch, MagicMock
 import requests
 
 import collectors.repo_security as repo_sec
+from collectors import Section
+
+
+def _md(result):
+    return result.markdown if isinstance(result, Section) else result
 
 
 class TestRepoSecurityOSV(unittest.TestCase):
@@ -63,7 +68,7 @@ class TestRepoSecurityOSV(unittest.TestCase):
 
             with patch("requests.post", side_effect=mock_post) as p_post, \
                  patch("requests.get", side_effect=mock_get):
-                out = repo_sec.collect({}, app_cfg)
+                out = _md(repo_sec.collect({}, app_cfg))
 
                 # Verifica que a query usou a versão instalada no lockfile (5.0.10), e não ^5.0.0 ou 5.0.0
                 call_args = p_post.call_args[1]["json"]["queries"]
@@ -159,14 +164,14 @@ class TestRepoSecurityOSV(unittest.TestCase):
 
             with patch("requests.post", side_effect=mock_post), \
                  patch("requests.get", side_effect=mock_get):
-                out = repo_sec.collect({}, app_cfg)
+                out = _md(repo_sec.collect({}, app_cfg))
 
                 # Deve conter emoji ⚠️, tag (dev) e gravidade máxima HIGH
                 self.assertIn("⚠️ **[DevTest]** `vitest` 1.0.0 (dev): 1 vulnerabilidade(s), gravidade máxima HIGH; corrigido em 1.0.4 (GHSA-high-dev)", out)
                 # Não deve conter 🚨
                 self.assertNotIn("🚨", out)
                 # Status no topo de menor risco
-                self.assertIn("⚠️ **Vulnerabilidades de menor risco:** 1 pacote(s) com alertas (baixa/média gravidade ou só de desenvolvimento).", out)
+                self.assertIn("⚠️ **Vulnerabilidades de menor risco:** 1 pacote(s) com alertas (gravidade baixa/média ou desconhecida, ou só de desenvolvimento).", out)
                 self.assertNotIn("🚨 **Atenção:**", out)
 
     def test_normal_dependency_with_high_generates_alert_and_atencao_status(self):
@@ -205,7 +210,7 @@ class TestRepoSecurityOSV(unittest.TestCase):
 
             with patch("requests.post", side_effect=mock_post), \
                  patch("requests.get", side_effect=mock_get):
-                out = repo_sec.collect({}, app_cfg)
+                out = _md(repo_sec.collect({}, app_cfg))
 
                 # Deve conter 🚨, não ter (dev)
                 self.assertIn("🚨 **[ProdTest]** `express` 4.17.1: 1 vulnerabilidade(s), gravidade máxima HIGH; corrigido em 4.18.2 (GHSA-high-prod)", out)
@@ -269,7 +274,7 @@ class TestRepoSecurityOSV(unittest.TestCase):
 
             with patch("requests.post", side_effect=mock_post), \
                  patch("requests.get", side_effect=mock_get):
-                out = repo_sec.collect({}, app_cfg)
+                out = _md(repo_sec.collect({}, app_cfg))
 
                 self.assertIn("corrigido em 1.1.0", out)
                 self.assertIn("gravidade máxima MODERATE", out)
@@ -310,7 +315,7 @@ class TestRepoSecurityOSV(unittest.TestCase):
 
             with patch("requests.post", side_effect=mock_post), \
                  patch("requests.get", side_effect=mock_get):
-                out = repo_sec.collect({}, app_cfg)
+                out = _md(repo_sec.collect({}, app_cfg))
 
                 self.assertIn("sem correção publicada", out)
                 self.assertNotIn("corrigido em", out)
@@ -361,7 +366,7 @@ class TestRepoSecurityOSV(unittest.TestCase):
 
             with patch("requests.post", side_effect=mock_post), \
                  patch("requests.get", side_effect=mock_get):
-                out = repo_sec.collect({}, app_cfg)
+                out = _md(repo_sec.collect({}, app_cfg))
 
                 self.assertIn("sem correção publicada", out)
 
@@ -391,10 +396,10 @@ class TestRepoSecurityOSV(unittest.TestCase):
 
             with patch("requests.post", side_effect=mock_post), \
                  patch("requests.get", side_effect=mock_get):
-                out = repo_sec.collect({}, app_cfg)
+                out = _md(repo_sec.collect({}, app_cfg))
 
                 self.assertIn("gravidade máxima UNKNOWN", out)
-                self.assertIn("sem correção publicada", out)
+                self.assertIn("versão que corrige não verificada", out)
                 self.assertIn("⚠️ **[FailGetProj]** `failpkg` 2.0.0: 1 vulnerabilidade(s)", out)
 
     def test_cache_and_max_60_calls_per_run(self):
@@ -493,7 +498,7 @@ class TestRepoSecurityOSV(unittest.TestCase):
 
             with patch("requests.post", side_effect=mock_post), \
                  patch("requests.get", side_effect=mock_get):
-                out = repo_sec.collect({}, app_cfg)
+                out = _md(repo_sec.collect({}, app_cfg))
 
                 # PyPI não tem dev=True, e com CRITICAL gera 🚨
                 self.assertIn("🚨 **[PyProj]** `django` 4.0.0: 1 vulnerabilidade(s), gravidade máxima CRITICAL; corrigido em 4.0.10 (GHSA-django)", out)
@@ -539,7 +544,7 @@ class TestRepoSecurityOSV(unittest.TestCase):
 
             with patch("requests.post", side_effect=mock_post), \
                  patch("requests.get", side_effect=mock_get):
-                out = repo_sec.collect({}, app_cfg)
+                out = _md(repo_sec.collect({}, app_cfg))
 
                 self.assertNotIn("(dev)", out)
                 self.assertIn("🚨 **[BothProj]** `shared` 1.0.0: 1 vulnerabilidade(s)", out)
@@ -586,7 +591,7 @@ class TestRepoSecurityOSV(unittest.TestCase):
 
             with patch("requests.post", side_effect=mock_post), \
                  patch("requests.get", side_effect=mock_get):
-                out = repo_sec.collect({}, app_cfg)
+                out = _md(repo_sec.collect({}, app_cfg))
 
                 self.assertIn("(GHSA-1, GHSA-2, GHSA-3 (+2))", out)
 
@@ -626,10 +631,10 @@ class TestRepoSecurityOSV(unittest.TestCase):
 
             with patch("requests.post", side_effect=mock_post), \
                  patch("requests.get", side_effect=mock_get):
-                out = repo_sec.collect({}, app_cfg)
+                out = _md(repo_sec.collect({}, app_cfg))
 
                 self.assertIn("⚠️ **[LowProj]** `lowpkg` 1.0.0: 1 vulnerabilidade(s), gravidade máxima MODERATE; corrigido em 1.0.2 (GHSA-low)", out)
-                self.assertIn("⚠️ **Vulnerabilidades de menor risco:** 1 pacote(s) com alertas (baixa/média gravidade ou só de desenvolvimento).", out)
+                self.assertIn("⚠️ **Vulnerabilidades de menor risco:** 1 pacote(s) com alertas (gravidade baixa/média ou desconhecida, ou só de desenvolvimento).", out)
                 self.assertNotIn("🚨", out)
 
     def test_check_errors_preserved_on_failure(self):
@@ -647,7 +652,7 @@ class TestRepoSecurityOSV(unittest.TestCase):
             }
 
             with patch("requests.post", side_effect=requests.ConnectionError("Network down")):
-                out = repo_sec.collect({}, app_cfg)
+                out = _md(repo_sec.collect({}, app_cfg))
 
                 self.assertIn("⚠️ **Verificação incompleta:** nenhum alerta encontrado, mas algumas consultas falharam.", out)
                 self.assertIn("⚠️ Não foi possível verificar: ErrProj (OSV.dev: ConnectionError)", out)
@@ -683,6 +688,62 @@ pydantic = "^2.0.0"
                 self.assertIn("requests", pkg_names)
                 self.assertIn("pydantic", pkg_names)
                 self.assertNotIn("python", pkg_names)
+
+
+    def _one_vuln(self, tmpdir, detail, post_ok=True):
+        pkg_json = os.path.join(tmpdir, "package.json")
+        with open(pkg_json, "w", encoding="utf-8") as f:
+            json.dump({"dependencies": {"express": "4.17.1"}}, f)
+        app_cfg = {"supported_projects": [{"name": "P", "pkg": pkg_json}]}
+
+        def mock_post(url, json=None, timeout=None):
+            if not post_ok:
+                raise requests.exceptions.ConnectionError("offline")
+            r = MagicMock()
+            r.json.return_value = {"results": [{"vulns": [{"id": "GHSA-x"}]}]}
+            return r
+
+        def mock_get(url, timeout=None):
+            r = MagicMock()
+            if detail is None:
+                r.status_code = 500
+                r.raise_for_status.side_effect = requests.exceptions.HTTPError("500")
+            else:
+                r.status_code = 200
+                r.json.return_value = detail
+            return r
+
+        with patch("requests.post", side_effect=mock_post), patch("requests.get", side_effect=mock_get):
+            return repo_sec.collect({}, app_cfg)
+
+    def test_faixa_git_nao_vira_versao(self):
+        detail = {"id": "GHSA-x", "database_specific": {"severity": "HIGH"}, "affected": [{
+            "package": {"name": "express", "ecosystem": "npm"},
+            "ranges": [{"type": "GIT", "events": [{"fixed": "4c18a1f"}]},
+                       {"type": "SEMVER", "events": [{"fixed": "4.18.2"}]}]}]}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = _md(self._one_vuln(tmpdir, detail))
+        self.assertIn("corrigido em 4.18.2", out)
+        self.assertNotIn("4c18a1f", out)
+
+    def test_detalhe_indisponivel_nao_afirma_sem_correcao(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = _md(self._one_vuln(tmpdir, None))
+        self.assertIn("versão que corrige não verificada", out)
+        self.assertNotIn("sem correção publicada", out)
+
+    def test_metrica_de_historico(self):
+        detail = {"id": "GHSA-x", "database_specific": {"severity": "LOW"}, "affected": []}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            res = self._one_vuln(tmpdir, detail)
+        self.assertIsInstance(res, Section)
+        self.assertEqual(res.metrics["Pacotes vulneráveis"]["value"], ["P: express 4.17.1"])
+
+    def test_verificacao_incompleta_nao_grava_metrica(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            res = self._one_vuln(tmpdir, None, post_ok=False)
+        self.assertIn("Verificação incompleta", _md(res))
+        self.assertEqual(getattr(res, "metrics", {}), {})
 
 
 if __name__ == "__main__":

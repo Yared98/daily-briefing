@@ -5,7 +5,7 @@ import re
 import subprocess
 import requests
 
-from collectors import register
+from collectors import Section, metric, register
 
 MAX_DEPS_PER_PROJECT = 50
 MAX_OSV_CALLS_PER_RUN = 60
@@ -170,6 +170,7 @@ def collect(cfg: dict, app_cfg: dict) -> str:
     repo_lines = []
     vuln_alerts = []
     check_errors = []
+    vuln_items = []  # para o histórico: "<Projeto>: <pacote> <versão>"
     get_calls_count = 0
 
     try:
@@ -193,7 +194,7 @@ def collect(cfg: dict, app_cfg: dict) -> str:
                     ).strip()
                     status_info = f"`{curr_branch}` • commit: {last_commit}"
                 except Exception:
-                    status_info = f"pasta encontrada, sem informação do git (branch esperada: `{p_branch}`)"
+                    status_info = "pasta local sem repositório Git (branch não se aplica)"
             elif p_slug:
                 status_info = f"repositório `{p_slug}` (remoto)"
             else:
@@ -221,6 +222,7 @@ def collect(cfg: dict, app_cfg: dict) -> str:
                             vuln_alerts.append(
                                 f"🚨 **[{p_name}]** `{pkg_n}` ({sev} • {cve}): {summary}... _(Correção: {fix})_"
                             )
+                            vuln_items.append(f"{p_name}: {pkg_n}")
                 except Exception as exc:
                     check_errors.append(f"{p_name} (Dependabot: {exc.__class__.__name__})")
 
@@ -298,7 +300,8 @@ def collect(cfg: dict, app_cfg: dict) -> str:
                                                 if (aff_pkg.get("name", "").lower() == dep_n.lower() and
                                                     aff_pkg.get("ecosystem", "").lower() == ecosystem.lower()):
                                                     for r in aff.get("ranges", []):
-                                                        if isinstance(r, dict):
+                                                        # faixas GIT trazem hashes de commit, não versões
+                                                        if isinstance(r, dict) and r.get("type", "ECOSYSTEM") in ("ECOSYSTEM", "SEMVER"):
                                                             for ev in r.get("events", []):
                                                                 if isinstance(ev, dict) and "fixed" in ev:
                                                                     f_val = str(ev["fixed"]).strip()
@@ -316,9 +319,13 @@ def collect(cfg: dict, app_cfg: dict) -> str:
 
                             max_sev = max(vuln_sevs, key=lambda s: SEVERITY_ORDER.get(s, 0)) if vuln_sevs else "UNKNOWN"
 
+                            missing_detail = any(not isinstance(_OSV_VULN_CACHE.get(vid), dict) for vid in v_ids)
                             if all_have_fix and vuln_fixes:
                                 fix_ver = max(vuln_fixes, key=_version_key)
                                 fix_str = f"corrigido em {fix_ver}"
+                            elif missing_detail:
+                                # sem o detalhe não dá para afirmar que não existe correção
+                                fix_str = "versão que corrige não verificada"
                             else:
                                 fix_str = "sem correção publicada"
 
@@ -331,6 +338,7 @@ def collect(cfg: dict, app_cfg: dict) -> str:
                                 f"{emoji} **[{p_name}]** `{dep_n}` {installed_ver}{dev_suffix}: "
                                 f"{len(v_ids)} vulnerabilidade(s), gravidade máxima {max_sev}; {fix_str} ({cves_str})"
                             )
+                            vuln_items.append(f"{p_name}: {dep_n} {installed_ver}")
                 except Exception as exc:
                     check_errors.append(f"{p_name} (OSV.dev: {exc.__class__.__name__})")
 
@@ -341,7 +349,7 @@ def collect(cfg: dict, app_cfg: dict) -> str:
             else:
                 status_badge = (
                     f"⚠️ **Vulnerabilidades de menor risco:** {len(vuln_alerts)} "
-                    f"pacote(s) com alertas (baixa/média gravidade ou só de desenvolvimento)."
+                    f"pacote(s) com alertas (gravidade baixa/média ou desconhecida, ou só de desenvolvimento)."
                 )
             alerts_text = "\n" + "\n".join(vuln_alerts)
         elif check_errors:
@@ -357,10 +365,13 @@ def collect(cfg: dict, app_cfg: dict) -> str:
         if check_errors:
             alerts_text += "\n" + "\n".join(f"⚠️ Não foi possível verificar: {e}" for e in check_errors)
 
-        return (
+        markdown = (
             f"* **Status de Vulnerabilidades:** {status_badge}{alerts_text}\n\n"
             f"#### 📦 Repositórios & Último Commit:\n"
             f"{chr(10).join(repo_lines)}"
         )
+        # Com verificação incompleta, não grava a lista: pacotes não checados apareceriam como "resolvidos".
+        metrics = {} if check_errors else {"Pacotes vulneráveis": metric(vuln_items, "set")}
+        return Section(markdown, metrics)
     except Exception as exc:
         return f"⚠️ Erro ao monitorar segurança dos repositórios: {exc}"
