@@ -17,6 +17,20 @@ def _read_linux_memory() -> tuple[float, float, float]:
     return total_gb, avail_gb, pct_used
 
 
+def _read_memory():
+    """(total_gb, avail_gb, pct_used) via psutil (Linux, macOS, Windows) ou /proc/meminfo; None se indisponível."""
+    try:
+        import psutil
+
+        vm = psutil.virtual_memory()
+        return vm.total / (1024**3), vm.available / (1024**3), vm.percent
+    except ImportError:
+        pass
+    if os.path.exists("/proc/meminfo"):
+        return _read_linux_memory()
+    return None
+
+
 def collect(cfg: dict) -> str:
     """Coleta saúde de disco, memória, CPU e containers Docker locais."""
     check_docker = cfg.get("check_docker", True)
@@ -31,8 +45,9 @@ def collect(cfg: dict) -> str:
 
         res_lines = [f"* **Armazenamento:** {d_free:.1f} GB livres de {d_tot:.1f} GB ({d_pct:.1f}% em uso) — {d_status}"]
 
-        if os.path.exists("/proc/meminfo"):
-            m_tot, m_avail, m_pct = _read_linux_memory()
+        memory = _read_memory()
+        if memory:
+            m_tot, m_avail, m_pct = memory
             m_status = "⚠️ Alerta (>85%)" if m_pct > 85 else "✅ Saudável"
             res_lines.append(
                 f"* **Memória RAM:** {m_avail:.1f} GB livres de {m_tot:.1f} GB ({m_pct:.1f}% em uso) — {m_status}"

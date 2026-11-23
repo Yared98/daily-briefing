@@ -93,6 +93,7 @@ def collect(projects: list) -> str:
 
     repo_lines = []
     vuln_alerts = []
+    check_errors = []
 
     try:
         for proj in projects:
@@ -143,8 +144,8 @@ def collect(projects: list) -> str:
                             vuln_alerts.append(
                                 f"🚨 **[{p_name}]** `{pkg_n}` ({sev} • {cve}): {summary}... _(Correção: {fix})_"
                             )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    check_errors.append(f"{p_name} (Dependabot: {exc.__class__.__name__})")
 
             pkg_path = proj.get("pkg")
             if not checked_via_gh and pkg_path and os.path.exists(pkg_path):
@@ -164,17 +165,24 @@ def collect(projects: list) -> str:
                             vuln_alerts.append(
                                 f"⚠️ **[{p_name}]** `{dep_n}`: {len(v_ids)} vulnerabilidade(s) conhecida(s) ({cves_str})"
                             )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    check_errors.append(f"{p_name} (OSV.dev: {exc.__class__.__name__})")
 
         if vuln_alerts:
             status_badge = f"🚨 **Atenção:** {len(vuln_alerts)} alerta(s) de vulnerabilidade identificado(s):"
             alerts_text = "\n" + "\n".join(vuln_alerts)
+        elif check_errors:
+            # Uma consulta que falhou nunca pode ser reportada como "tudo seguro".
+            status_badge = "⚠️ **Verificação incompleta:** nenhum alerta encontrado, mas algumas consultas falharam."
+            alerts_text = ""
         else:
             status_badge = (
                 "✅ **Todos os repositórios seguros:** Nenhuma vulnerabilidade crítica ou alta detectada."
             )
             alerts_text = ""
+
+        if check_errors:
+            alerts_text += "\n" + "\n".join(f"⚠️ Não foi possível verificar: {e}" for e in check_errors)
 
         return (
             f"* **Status de Vulnerabilidades:** {status_badge}{alerts_text}\n\n"

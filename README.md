@@ -57,8 +57,8 @@ Requer **Python 3.11+** (Linux, macOS ou Windows).
 
 - **Prompt do assistente:** edite `templates/assistant_prompt.md` (ou aponte `assistant_prompt.template_path` para outro arquivo). Variáveis disponíveis: `$owner_name`, `$briefing_ref`, `$doc_name`, `$agenda_hint` e `$focus_items` (lista montada a partir dos coletores habilitados). Desligue com `assistant_prompt.enabled: false`.
 - **Tabela de referência de modelos:** `collectors.news_ai.model_reference` é uma lista mantida à mão (nome, preço, observação). Vem desligada; não há busca automática de preços.
-- **Segurança de dependências:** em `supported_projects`, o campo `pkg` aceita `package.json` (npm), `requirements*.txt` ou `pyproject.toml` (PyPI, PEP 621 e Poetry). Sem `GITHUB_TOKEN` (ou sem acesso ao Dependabot do repositório), as versões são consultadas no [OSV.dev](https://osv.dev). Para faixas como `>=1.2` ou `^1.2`, é usada a versão mínima, o que pode apontar alertas já resolvidos na versão instalada.
-- **Infraestrutura:** disco funciona em qualquer sistema; RAM e load average só em Linux; Docker quando o comando `docker` estiver disponível.
+- **Segurança de dependências:** em `supported_projects`, o campo `pkg` aceita `package.json` (npm), `requirements*.txt` ou `pyproject.toml` (PyPI, PEP 621 e Poetry). Sem `GITHUB_TOKEN` (ou sem acesso ao Dependabot do repositório), as versões são consultadas no [OSV.dev](https://osv.dev). Para faixas como `>=1.2` ou `^1.2`, é usada a versão mínima, o que pode apontar alertas já resolvidos na versão instalada. Se alguma consulta falhar (rede, permissão), o relatório mostra "Verificação incompleta" em vez de declarar os repositórios seguros.
+- **Infraestrutura:** disco e RAM funcionam em Linux, macOS e Windows; load average só em Linux/macOS; Docker quando o comando `docker` estiver disponível e o serviço estiver rodando.
 
 ## Agendamento
 
